@@ -3,7 +3,6 @@ const cors = require('cors')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 const path = require('path')
-const WebSocket = require('ws')
 const http = require('http')
 require('dotenv').config()
 
@@ -11,9 +10,11 @@ const logger = require('./middleware/logger')
 const webhookRoutes = require('./routes/webhook')
 const apiRoutes = require('./routes/api')
 const { initializeDatabase } = require('./models/webhook')
+const { initializeWebSocket } = require('./utils/websocket')
 
 const app = express()
 const PORT = process.env.PORT || 3000
+const HOST = process.env.HOST || '0.0.0.0'
 
 // Rate limiting
 const limiter = rateLimit({
@@ -23,8 +24,28 @@ const limiter = rateLimit({
 })
 
 // Middleware
-app.use(helmet())
-app.use(cors())
+// Desactivar CSP y HSTS en desarrollo para evitar problemas de carga de recursos
+const isDevelopment = process.env.NODE_ENV !== 'production'
+
+app.use(helmet({
+  contentSecurityPolicy: isDevelopment ? false : {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https:"],
+      connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  strictTransportSecurity: isDevelopment ? false : {
+    maxAge: 15552000,
+    includeSubDomains: true
+  }
+}))
+app.use(cors({
+  origin: true,
+  credentials: true
+}))
 app.use(limiter)
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
@@ -70,25 +91,7 @@ app.use((req, res) => {
 
 // Crear servidor HTTP y WebSocket
 const server = http.createServer(app)
-const wss = new WebSocket.Server({ server })
-
-// WebSocket para actualizaciones en tiempo real
-wss.on('connection', (ws) => {
-  console.log('Cliente WebSocket conectado')
-  
-  ws.on('close', () => {
-    console.log('Cliente WebSocket desconectado')
-  })
-})
-
-// Función para enviar actualizaciones a todos los clientes conectados
-function broadcastUpdate(data) {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(data))
-    }
-  })
-}
+const wss = initializeWebSocket(server)
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
@@ -111,10 +114,23 @@ process.on('SIGINT', () => {
 async function startServer() {
   try {
     await initializeDatabase()
-    server.listen(PORT, () => {
-      console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`)
+    server.listen(PORT, HOST, () => {
+      console.log(`🚀 Servidor corriendo en http://${HOST}:${PORT}`)
       console.log(`📊 Dashboard disponible en http://localhost:${PORT}`)
       console.log(`🏥 Health check en http://localhost:${PORT}/health`)
+      console.log(`📱 Acceso desde red local: http://<tu-ip-local>:${PORT}`)
+    })
+    
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Error: El puerto ${PORT} ya está en uso`)
+        console.error('💡 Soluciones:')
+        console.error(`   1. Mata el proceso: npx kill-port ${PORT}`)
+        console.error(`   2. Usa otro puerto: PORT=${parseInt(PORT) + 1} npm start`)
+      } else {
+        console.error('❌ Error del servidor:', error.message)
+      }
+      process.exit(1)
     })
   } catch (error) {
     console.error('Error al iniciar el servidor:', error)
@@ -124,4 +140,4 @@ async function startServer() {
 
 startServer()
 
-module.exports = { app, broadcastUpdate }
+module.exports = { app }
