@@ -1,6 +1,6 @@
 {
   "name": "node-webhook-receiver",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Aplicación para recibir, almacenar y mostrar webhooks en tiempo real",
   "main": "src/server.js",
   "scripts": {
@@ -34,7 +34,7 @@
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
     "morgan": "^1.10.0",
-    "sqlite3": "^5.0.2",
+    "sqlite3": "^5.1.7",
     "uuid": "^9.0.1",
     "ws": "^8.14.2"
   },
