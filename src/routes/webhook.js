@@ -1,15 +1,17 @@
 const express = require('express')
 const { createWebhook } = require('../models/webhook')
-const { broadcastUpdate } = require('../server')
+const { broadcastUpdate } = require('../utils/websocket')
 const router = express.Router()
 
 // POST /webhook/:event - Recibir webhook
 router.post('/:event', async (req, res) => {
+  const sourceIp = req.ip || req.connection.remoteAddress
+  console.log(`📥 Webhook POST recibido en /webhook/${req.params.event} desde ${sourceIp}`)
+  
   try {
     const eventType = req.params.event
     const headers = req.headers
     const payload = req.body
-    const sourceIp = req.ip || req.connection.remoteAddress
 
     // Crear webhook en la base de datos
     const webhook = await createWebhook({
@@ -51,10 +53,12 @@ router.post('/:event', async (req, res) => {
 
 // POST /webhook - Recibir webhook sin tipo de evento
 router.post('/', async (req, res) => {
+  const sourceIp = req.ip || req.connection.remoteAddress
+  console.log(`📥 Webhook POST recibido en /webhook desde ${sourceIp}`)
+  
   try {
     const headers = req.headers
     const payload = req.body
-    const sourceIp = req.ip || req.connection.remoteAddress
     
     // Intentar detectar el tipo de evento desde los headers
     const eventType = headers['x-event-type'] || 
