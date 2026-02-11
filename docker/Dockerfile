@@ -1,5 +1,5 @@
 # Etapa de construcción
-FROM node:18-alpine AS builder
+FROM node:18 AS builder
 
 WORKDIR /app
 
@@ -10,19 +10,21 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 # Etapa final
-FROM node:18-alpine
+FROM node:18-slim
 
 WORKDIR /app
 
 # Crear usuario no-root
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S webhook -u 1001
+RUN groupadd -r nodejs && useradd -r -g nodejs webhook
+
+# Copiar código de la aplicación (sin node_modules locales)
+COPY --chown=webhook:nodejs . .
+
+# Eliminar node_modules locales de Windows si existen
+RUN rm -rf node_modules
 
 # Copiar dependencias desde la etapa de construcción
 COPY --from=builder --chown=webhook:nodejs /app/node_modules ./node_modules
-
-# Copiar código de la aplicación
-COPY --chown=webhook:nodejs . .
 
 # Cambiar al usuario no-root
 USER webhook
