@@ -10,6 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      - DB_PATH=/app/data/webhooks.db
     volumes:
       - webhook-data:/app/data
     restart: unless-stopped

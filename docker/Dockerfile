@@ -26,6 +26,9 @@ RUN rm -rf node_modules
 # Copiar dependencias desde la etapa de construcción
 COPY --from=builder --chown=webhook:nodejs /app/node_modules ./node_modules
 
+# Crear directorio de datos con permisos correctos
+RUN mkdir -p /app/data && chown webhook:nodejs /app/data
+
 # Cambiar al usuario no-root
 USER webhook
 
